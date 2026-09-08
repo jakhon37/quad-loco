@@ -72,9 +72,10 @@ Verified on an Intel Mac with no GPU: PD stand holds at **0.62 m**, tests pass, 
 
 **Colab (the practical training run):**
 
-1. Runtime → GPU (T4 is enough).
-2. Clone this repo.
-3. Open `notebooks/colab_train.ipynb` and run all.
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/jakhon37/quad-loco/blob/main/notebooks/colab_train.ipynb)
+
+1. Open the badge (or `notebooks/colab_train.ipynb`) and set Runtime → **T4 GPU**.
+2. Run all cells. The first cell clones this repo into `/content/quad-loco` (opening the notebook from GitHub does not copy the rest of the project).
 
 ```bash
 pip install -r requirements.txt
