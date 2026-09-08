@@ -1,0 +1,14 @@
+# Intel macOS: pin MuJoCo 3.10 (3.11+ dropped x86_64 wheels).
+# Linux / Apple Silicon / Colab can use a newer 3.x if you want.
+mujoco==3.10.0
+gymnasium>=1.0.0
+stable-baselines3>=2.4.0
+torch
+numpy
+pyyaml
+imageio
+imageio-ffmpeg
+tensorboard
+onnx
+onnxruntime
+pytest
