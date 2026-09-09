@@ -54,7 +54,7 @@ Trained locally on CPU with `configs/ppo_cpu.yaml` (~48 min, ~550 fps).
 |---|---|---|
 | Eval episode length | short | **1000 / 1000** (20 s, no fall) |
 | Mean eval return | ~260 | **~2400** |
-| Mean `|v_x − 0.5 m/s|` | 0.50 m/s | **0.045 m/s** |
+| Tracking error vs 0.5 m/s | 0.50 m/s | **0.045 m/s** |
 
 Eight thousand steps is enough to stand. On the order of **1.5×10^6** steps is enough to track a forward command and step. Clip above: [docs/walk.gif](docs/walk.gif) / [docs/walk.mp4](docs/walk.mp4).
 
