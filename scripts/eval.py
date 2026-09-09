@@ -43,13 +43,21 @@ def main() -> int:
     parser.add_argument("--deterministic", action="store_true", default=True)
     args = parser.parse_args()
 
-    log("importing torch / sb3 / mujoco env …")
+    log("import torch")
+    import torch
+
+    log(f"torch {torch.__version__}  cuda={torch.cuda.is_available()}")
+    log("import stable_baselines3")
     from stable_baselines3 import PPO
     from stable_baselines3.common.vec_env import DummyVecEnv, VecNormalize
 
     from quad_loco.checkpoints import resolve_sb3_zip
     from quad_loco.constants import CONTROL_DT
+
+    log("import mujoco env (OSMesa load happens here)")
     from quad_loco.env import QuadrupedVelocityEnv
+
+    log("imports done")
 
     model_path = resolve_sb3_zip(args.model)
     log(f"model {model_path}")
