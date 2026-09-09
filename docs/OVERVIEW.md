@@ -92,6 +92,8 @@ q_target = q_default + 0.25 · action
 
 An 8k-step smoke run typically **stands** (`len` short, `|vx − cmd|` still large). A usable walk needs on the order of **1.5×10^6** steps (tens of minutes on a laptop CPU).
 
+A local CPU run at 1.5M steps (`logs/local_walk`) reached eval length **1000 / 1000**, mean return **~2400**, and `|v_x − 0.5| ≈ 0.045` m/s. The clip in the README is that policy.
+
 ---
 
 ## Tools and what each one does
@@ -164,4 +166,4 @@ python scripts/train.py --config configs/ppo_cpu.yaml --timesteps 8192 --run-nam
 python scripts/eval.py --model logs/smoke/final_model.zip --easy --command 0.5 0 0 --video videos/walk.mp4
 ```
 
-`--run-name smoke` writes `logs/smoke/final_model.zip`, not `logs/local_walk/`.
+`--run-name smoke` writes `logs/smoke/final_model.zip`. After a full train, eval `logs/local_walk/final_model.zip` instead.

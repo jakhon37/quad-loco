@@ -199,7 +199,7 @@ def _add_sites_and_camera(root: ET.Element) -> None:
         cam = ET.SubElement(trunk, "camera")
         cam.set("name", "track")
         cam.set("mode", "trackcom")
-        cam.set("pos", "2.4 -2.0 1.3")
+        cam.set("pos", "1.2 -1.05 0.58")
         cam.set("xyaxes", "1 1 0 -0.2 0.2 1")
     for foot in ("FL_foot", "FR_foot", "RL_foot", "RR_foot"):
         body = _find_body(root, foot)

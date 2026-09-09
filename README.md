@@ -4,19 +4,15 @@ Velocity-tracking locomotion for a custom 12-DoF quadruped in [MuJoCo](https://m
 
 No NVIDIA GPU is required. Physics and the MLP both run on CPU.
 
-**PD stand (no learned policy)** — MuJoCo interactive viewer:
+<p align="center">
+  <img src="docs/walk.gif" alt="1.5M-step PPO policy tracking 0.5 m/s" width="560">
+</p>
 
-![PD stand in the MuJoCo viewer](docs/stand_v2.png)
-
-<video src="docs/stand.mp4" width="640" autoplay loop muted playsinline controls>
-  <a href="docs/stand.mp4">stand.mp4</a>
-</video>
-
-**Smoke policy rollout** (8k PPO steps, command `v_x = 0.5` m/s — still a stand, not a gait):
-
-<video src="docs/policy_smoke.mp4" width="640" autoplay loop muted playsinline controls>
-  <a href="docs/policy_smoke.mp4">policy_smoke.mp4</a>
-</video>
+<p align="center">
+  <b>1.5M-step PPO</b> · command <code>v_x = 0.5</code> m/s
+  · mean <code>|v_x − cmd| = 0.045</code> m/s
+  · <a href="docs/walk.mp4">mp4</a>
+</p>
 
 ```
 URDF → MJCF → Gymnasium env → PPO → eval / video → ONNX
@@ -39,6 +35,28 @@ Details: **[docs/OVERVIEW.md](docs/OVERVIEW.md)**.
 **Action** (12): `q_target = q_default + 0.25 · a`, `a ∈ [-1, 1]`.
 
 Meshes and URDF are adapted from a public custom-quadruped model; this repository is the MuJoCo training and export stack.
+
+PD stand in the interactive MuJoCo viewer — no learned policy, default pose held by PD:
+
+![PD stand in the MuJoCo viewer](docs/stand_v2.png)
+
+```bash
+python scripts/stand.py --viewer
+```
+
+Close the window to exit. Headless `python scripts/stand.py` is the pass/fail check.
+
+## Results
+
+Trained locally on CPU with `configs/ppo_cpu.yaml` (~48 min, ~550 fps).
+
+| | 8k smoke | 1.5M `local_walk` |
+|---|---|---|
+| Eval episode length | short | **1000 / 1000** (20 s, no fall) |
+| Mean eval return | ~260 | **~2400** |
+| Mean `|v_x − 0.5 m/s|` | 0.50 m/s | **0.045 m/s** |
+
+Eight thousand steps is enough to stand. On the order of **1.5×10^6** steps is enough to track a forward command and step. Clip above: [docs/walk.gif](docs/walk.gif) / [docs/walk.mp4](docs/walk.mp4).
 
 ## Setup
 
@@ -63,14 +81,6 @@ python -u scripts/check.py       # timed imports + env step (no trained policy)
 python -u scripts/check.py --render
 python -m pytest tests -q
 ```
-
-Interactive view (plain `python`, not `mjpython`):
-
-```bash
-python scripts/stand.py --viewer
-```
-
-Close the window to exit. Headless `python scripts/stand.py` is the pass/fail check.
 
 ## Train
 
@@ -105,19 +115,19 @@ tensorboard --logdir logs/<run>
 
 ## Eval and export
 
-`--run-name smoke` writes `logs/smoke/final_model.zip`:
+`--run-name` must match the zip you load. Smoke writes `logs/smoke/final_model.zip`; a full run writes `logs/local_walk/final_model.zip`.
 
 ```bash
-python scripts/eval.py --model logs/smoke/final_model.zip --easy --command 0.5 0 0 --video videos/walk.mp4
-python scripts/export_onnx.py --model logs/smoke/final_model.zip --out logs/smoke/policy.onnx
+python scripts/eval.py --model logs/local_walk/final_model.zip --easy --command 0.5 0 0 --video videos/walk.mp4 --max-seconds 6 --render-every 2
+python scripts/export_onnx.py --model logs/local_walk/final_model.zip --out logs/local_walk/policy.onnx
 ```
 
-Keep `vecnormalize.pkl` next to the zip. Eval writes an MP4 and `*_preview.png` when rendering is available.
+Keep `vecnormalize.pkl` next to the zip. Eval writes an MP4 and `*_preview.png` when rendering is available. GitHub does not play repo MP4s in the README, so the looping GIF above is the in-page preview.
 
 ## Layout
 
 ```
-docs/           overview, stand screenshot, demo videos
+docs/           overview, viewer screenshot, walk gif/mp4
 robot/          URDF, STL meshes, MJCF scene
 src/quad_loco/  environment, converter, export
 scripts/        stand, train, eval, export, check

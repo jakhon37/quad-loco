@@ -41,6 +41,12 @@ def main() -> int:
     parser.add_argument("--command", nargs=3, type=float, default=None, metavar=("VX", "VY", "YAW"))
     parser.add_argument("--video", type=Path, default=None)
     parser.add_argument("--max-seconds", type=float, default=8.0, help="Cap recorded video length")
+    parser.add_argument(
+        "--render-every",
+        type=int,
+        default=None,
+        help="Capture every N control steps (default: 1, or skip if the first frame is slow)",
+    )
     parser.add_argument("--deterministic", action="store_true", default=True)
     args = parser.parse_args()
 
@@ -108,7 +114,10 @@ def main() -> int:
         else:
             dt = time.time() - t_r
             log(f"first frame ok in {dt:.1f}s  shape={getattr(probe, 'shape', None)}")
-            if dt > 0.4 and max_steps:
+            if args.render_every is not None:
+                render_every = max(1, args.render_every)
+                log(f"capturing every {render_every} steps")
+            elif dt > 0.4 and max_steps:
                 render_every = max(2, int(dt / 0.15))
                 log(f"slow renderer: capturing every {render_every} steps")
 
@@ -152,8 +161,9 @@ def main() -> int:
         f"mean_|vx-cmd|={np.mean(vx_err) if vx_err else float('nan'):.3f}"
     )
     if want_video and frames:
-        log(f"encoding {len(frames)} frames …")
-        written = save_rollout_visuals(frames, args.video)
+        fps = max(1, int(round((1.0 / CONTROL_DT) / render_every)))
+        log(f"encoding {len(frames)} frames at {fps} fps …")
+        written = save_rollout_visuals(frames, args.video, fps=fps)
         for kind, path in written.items():
             log(f"wrote {kind}: {path} ({path.stat().st_size} bytes)")
     elif args.video and not frames:
