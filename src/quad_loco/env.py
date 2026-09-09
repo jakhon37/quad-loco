@@ -297,8 +297,18 @@ class QuadrupedVelocityEnv(gym.Env):
             return None
         if self._renderer is None:
             self._renderer = mujoco.Renderer(self.model, height=480, width=640)
-        self._renderer.update_scene(self.data, camera="track")
+        self._renderer.update_scene(self.data, camera=self._follow_camera())
         return self._renderer.render()
+
+    def _follow_camera(self) -> mujoco.MjvCamera:
+        """3/4 follow shot with the near-side front foot fully in frame."""
+        cam = mujoco.MjvCamera()
+        cam.type = mujoco.mjtCamera.mjCAMERA_TRACKING
+        cam.trackbodyid = int(self.trunk_body)
+        cam.distance = 2.05
+        cam.azimuth = 140.0
+        cam.elevation = -28.0
+        return cam
 
     def close(self) -> None:
         if self._renderer is not None:
