@@ -9,27 +9,28 @@ import sys
 import warnings
 from pathlib import Path
 
-# Headless Colab/Linux has no DISPLAY. Set this before importing mujoco.
-if sys.platform == "linux" and not os.environ.get("DISPLAY"):
-    os.environ.setdefault("MUJOCO_GL", "egl")
-
-import numpy as np
-
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "3")
 warnings.filterwarnings("ignore", message="Gym has been unmaintained")
 warnings.filterwarnings("ignore", message="You are trying to run PPO on the GPU")
 
+from quad_loco.gl_setup import configure_mujoco_gl, save_rollout_visuals  # noqa: E402
+
+GL = configure_mujoco_gl()
+
+import numpy as np  # noqa: E402
+
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--model", type=Path, required=True)
     parser.add_argument("--vecnorm", type=Path, default=None)
-    parser.add_argument("--episodes", type=int, default=3)
+    parser.add_argument("--episodes", type=int, default=1)
     parser.add_argument("--easy", action="store_true")
     parser.add_argument("--command", nargs=3, type=float, default=None, metavar=("VX", "VY", "YAW"))
     parser.add_argument("--video", type=Path, default=None)
+    parser.add_argument("--max-seconds", type=float, default=8.0, help="Cap recorded video length")
     parser.add_argument("--deterministic", action="store_true", default=True)
     args = parser.parse_args()
 
@@ -37,12 +38,15 @@ def main() -> int:
     from stable_baselines3.common.vec_env import DummyVecEnv, VecNormalize
 
     from quad_loco.checkpoints import resolve_sb3_zip
+    from quad_loco.constants import CONTROL_DT
     from quad_loco.env import QuadrupedVelocityEnv
 
+    print(f"MUJOCO_GL={GL}")
     model_path = resolve_sb3_zip(args.model)
     command = tuple(args.command) if args.command else None
     want_video = args.video is not None
     render_mode = "rgb_array" if want_video else None
+    max_steps = int(args.max_seconds / CONTROL_DT) if want_video else None
 
     def _make():
         return QuadrupedVelocityEnv(easy=args.easy, command=command, render_mode=render_mode)
@@ -74,6 +78,7 @@ def main() -> int:
         done = False
         ep_ret = 0.0
         infos = [{}]
+        steps = 0
         while not done:
             action, _ = model.predict(obs, deterministic=args.deterministic)
             obs, reward, dones, infos = venv.step(action)
@@ -82,26 +87,26 @@ def main() -> int:
             cmd = infos[0].get("command")
             if lin is not None and cmd is not None:
                 vx_err.append(abs(float(lin[0]) - float(cmd[0])))
-            if want_video:
+            if want_video and (max_steps is None or steps < max_steps):
                 try:
                     frame = raw.render()
                     if frame is not None:
                         frames.append(frame)
                 except Exception as exc:
-                    print(f"video disabled ({type(exc).__name__}: {exc})")
-                    print("hint: on Colab this is normal without EGL; metrics still count")
+                    print(f"render failed with MUJOCO_GL={GL}: {type(exc).__name__}: {exc}")
                     want_video = False
-            done = bool(dones[0])
+            steps += 1
+            done = bool(dones[0]) or (max_steps is not None and steps >= max_steps)
         returns.append(ep_ret)
-        print(f"episode {ep}: return={ep_ret:.2f} height={infos[0].get('base_height')}")
+        print(f"episode {ep}: return={ep_ret:.2f} height={infos[0].get('base_height')} steps={steps}")
 
     print(f"mean_return={np.mean(returns):.2f} mean_|vx-cmd|={np.mean(vx_err) if vx_err else float('nan'):.3f}")
     if want_video and frames:
-        import imageio.v2 as imageio
-
-        args.video.parent.mkdir(parents=True, exist_ok=True)
-        imageio.mimsave(args.video, frames, fps=50)
-        print(f"wrote {args.video}")
+        written = save_rollout_visuals(frames, args.video)
+        for kind, path in written.items():
+            print(f"wrote {kind}: {path} ({path.stat().st_size} bytes)")
+    elif args.video and not frames:
+        print("no frames captured; install libosmesa6 (Colab: apt-get install libosmesa6)")
     venv.close()
     return 0
 
