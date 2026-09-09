@@ -4,10 +4,7 @@
 from __future__ import annotations
 
 import argparse
-import os
-import shutil
 import sys
-import time
 from pathlib import Path
 
 import numpy as np
@@ -19,35 +16,12 @@ from quad_loco.constants import CONTROL_DT, FRAME_SKIP, HOME_HEIGHT  # noqa: E40
 from quad_loco.paths import scene_xml  # noqa: E402
 
 
-def _reexec_mjpython() -> None:
-    """Cocoa requires the MuJoCo GUI on the main thread; mjpython does that."""
-    if sys.platform != "darwin":
-        return
-    if "mjpython" in Path(sys.executable).name:
-        return
-    mjpython = shutil.which("mjpython")
-    if mjpython is None:
-        sibling = Path(sys.executable).resolve().parent / "mjpython"
-        if sibling.is_file():
-            mjpython = str(sibling)
-    if mjpython is None:
-        raise SystemExit(
-            "On macOS the interactive viewer must be started with mjpython "
-            "(not python):\n"
-            "  mjpython scripts/stand.py --viewer"
-        )
-    os.execv(mjpython, [mjpython, *sys.argv])
-
-
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--seconds", type=float, default=3.0)
     parser.add_argument("--viewer", action="store_true")
     parser.add_argument("--xml", type=Path, default=None)
     args = parser.parse_args()
-
-    if args.viewer:
-        _reexec_mjpython()
 
     import mujoco
 
@@ -82,22 +56,14 @@ def main() -> int:
     if args.viewer:
         from mujoco import viewer
 
-        dt = model.opt.timestep * FRAME_SKIP
-        print("Opening MuJoCo window. Close it (or Ctrl+C) to exit.", flush=True)
-        print(
-            "On macOS, mjpython may print 'Task policy set failed'; that is a "
-            "Cocoa thread-QoS warning and can be ignored if the window is open.",
-            flush=True,
-        )
+        # Hold the home pose. viewer.launch() runs GLFW on this thread (works
+        # with plain python on macOS). mjpython/launch_passive hangs here.
+        data.ctrl[:] = model.key_ctrl[0]
+        for _ in range(n_steps):
+            physics_step(record=True)
+        print("Opening MuJoCo window. Close the window to exit.", flush=True)
         try:
-            with viewer.launch_passive(model, data) as vis:
-                while vis.is_running():
-                    t0 = time.perf_counter()
-                    physics_step(record=len(heights) < n_steps)
-                    vis.sync()
-                    leftover = dt - (time.perf_counter() - t0)
-                    if leftover > 0:
-                        time.sleep(leftover)
+            viewer.launch(model, data)
         except KeyboardInterrupt:
             print("\nviewer interrupted", flush=True)
     else:

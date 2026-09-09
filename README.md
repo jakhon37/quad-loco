@@ -50,15 +50,13 @@ python -u scripts/check.py --render   # also probe one off-screen frame
 python -m pytest tests -q
 ```
 
-`scripts/stand.py` is the headless check. On **macOS**, the windowed viewer must use `mjpython` (MuJoCo’s Cocoa launcher), not `python`:
+Interactive view (plain `python`, not `mjpython`):
 
 ```bash
-mjpython scripts/stand.py --viewer
+python scripts/stand.py --viewer
 ```
 
-(`scripts/stand.py --viewer` re-execs `mjpython` automatically if it is on `PATH`.)
-
-macOS may print `Task policy set failed: 4 ((os/kern) invalid argument)` from mjpython. That is a Cocoa thread-QoS warning, not a physics failure. A window should still open; close it to finish. Headless `python scripts/stand.py` is the actual pass/fail check.
+Close the window to exit. Headless `python scripts/stand.py` is the pass/fail check.
 
 ## Train
 
