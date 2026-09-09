@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
-"""Hold the Isaac Lab home pose with PD and report whether the robot stays up."""
+"""Hold the default pose with PD and report whether the robot stays up."""
 
 from __future__ import annotations
 
 import argparse
+import os
+import shutil
 import sys
 from pathlib import Path
 
@@ -16,12 +18,35 @@ from quad_loco.constants import CONTROL_DT, FRAME_SKIP, HOME_HEIGHT  # noqa: E40
 from quad_loco.paths import scene_xml  # noqa: E402
 
 
+def _reexec_mjpython() -> None:
+    """Cocoa requires the MuJoCo GUI on the main thread; mjpython does that."""
+    if sys.platform != "darwin":
+        return
+    if "mjpython" in Path(sys.executable).name:
+        return
+    mjpython = shutil.which("mjpython")
+    if mjpython is None:
+        sibling = Path(sys.executable).resolve().parent / "mjpython"
+        if sibling.is_file():
+            mjpython = str(sibling)
+    if mjpython is None:
+        raise SystemExit(
+            "On macOS the interactive viewer must be started with mjpython "
+            "(not python):\n"
+            "  mjpython scripts/stand.py --viewer"
+        )
+    os.execv(mjpython, [mjpython, *sys.argv])
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--seconds", type=float, default=3.0)
     parser.add_argument("--viewer", action="store_true")
     parser.add_argument("--xml", type=Path, default=None)
     args = parser.parse_args()
+
+    if args.viewer:
+        _reexec_mjpython()
 
     import mujoco
 
@@ -40,30 +65,36 @@ def main() -> int:
     heights = []
     tilts = []
 
-    def run_loop(sync=None):
-        for _ in range(n_steps):
-            data.ctrl[:] = model.key_ctrl[0]
-            for _ in range(FRAME_SKIP):
-                mujoco.mj_step(model, data)
-            heights.append(float(data.qpos[2]))
-            rot = data.xmat[mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_BODY, "trunk")].reshape(3, 3)
-            gravity = rot.T @ np.array([0.0, 0.0, -1.0])
-            tilts.append(float(np.linalg.norm(gravity[:2])))
-            if sync is not None:
-                sync()
+    def sample_stats() -> None:
+        heights.append(float(data.qpos[2]))
+        rot = data.xmat[mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_BODY, "trunk")].reshape(3, 3)
+        gravity = rot.T @ np.array([0.0, 0.0, -1.0])
+        tilts.append(float(np.linalg.norm(gravity[:2])))
+
+    def physics_step() -> None:
+        data.ctrl[:] = model.key_ctrl[0]
+        for _ in range(FRAME_SKIP):
+            mujoco.mj_step(model, data)
+        sample_stats()
 
     if args.viewer:
         from mujoco import viewer
 
         with viewer.launch_passive(model, data) as vis:
-            run_loop(sync=vis.sync)
+            while vis.is_running():
+                physics_step()
+                vis.sync()
     else:
-        run_loop()
+        for _ in range(n_steps):
+            physics_step()
 
+    if not heights:
+        print("no samples")
+        return 1
     z0 = heights[0]
-    z1 = heights[-1]
-    mean_z = float(np.mean(heights))
-    mean_tilt = float(np.mean(tilts))
+    z1 = heights[min(len(heights) - 1, n_steps - 1)]
+    mean_z = float(np.mean(heights[:n_steps] if len(heights) >= n_steps else heights))
+    mean_tilt = float(np.mean(tilts[:n_steps] if len(tilts) >= n_steps else tilts))
     print(f"home_height_target={HOME_HEIGHT:.3f} dt={CONTROL_DT:.3f}s")
     print(f"z_start={z0:.3f} z_end={z1:.3f} z_mean={mean_z:.3f} tilt_xy_mean={mean_tilt:.3f}")
     ok = z1 > 0.35 and mean_tilt < 0.35 and (z0 - z1) < 0.25

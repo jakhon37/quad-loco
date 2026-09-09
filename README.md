@@ -50,7 +50,13 @@ python -u scripts/check.py --render   # also probe one off-screen frame
 python -m pytest tests -q
 ```
 
-`scripts/stand.py --viewer` opens an interactive window when a display is available.
+`scripts/stand.py` is the headless check. On **macOS**, the windowed viewer must use `mjpython` (MuJoCo’s Cocoa launcher), not `python`:
+
+```bash
+mjpython scripts/stand.py --viewer
+```
+
+(`scripts/stand.py --viewer` re-execs `mjpython` automatically if it is on `PATH`.)
 
 ## Train
 
