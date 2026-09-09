@@ -24,74 +24,23 @@ def load_config(path: Path) -> dict:
         return yaml.safe_load(f)
 
 
-# def make_env(src: str, easy: bool, seed: int, idx: int, render_mode=None):
-#     """Factory whose body runs inside each vec-env worker (forkserver-safe)."""
+def make_env(src: str, easy: bool, seed: int, idx: int, render_mode=None):
+    """Factory whose body runs inside each vec-env worker (forkserver-safe)."""
 
-#     def _init():
-#         import sys as _sys
-
-#         if src not in _sys.path:
-#             _sys.path.insert(0, src)
-#         from quad_loco.env import QuadrupedVelocityEnv
-
-#         env = QuadrupedVelocityEnv(easy=easy, render_mode=render_mode)
-#         env.reset(seed=seed + idx)
-#         return env
-
-#     return _init
-# def make_env(env_id: str, easy: bool, seed: int, idx: int, render_mode=None):
-#     def _init():
-#         import sys
-#         from pathlib import Path
-
-#         src = Path(__file__).resolve().parents[1] / "src"
-#         if str(src) not in sys.path:
-#             sys.path.insert(0, str(src))
-
-#         import gymnasium as gym
-#         import quad_loco  # noqa: F401
-
-#         env = gym.make(env_id, easy=easy, render_mode=render_mode)
-#         env.reset(seed=seed + idx)
-#         return env
-
-#     return _init
-
-
-# def make_env(env_id: str, easy: bool, seed: int, idx: int, render_mode=None):
-#     def _init():
-#         import sys
-#         from pathlib import Path
-
-#         root = Path(__file__).resolve().parents[1]
-#         src = str(root / "src")
-#         if src not in sys.path:
-#             sys.path.insert(0, src)
-
-#         import gymnasium as gym
-#         import quad_loco  # noqa: F401 - registers env ids as a side effect
-
-#         env = gym.make(env_id, easy=easy, render_mode=render_mode)
-#         env.reset(seed=seed + idx)
-#         return env
-
-#     return _init
-    
-def make_env(easy: bool, seed: int, idx: int, render_mode=None):
     def _init():
-        import sys
-        from pathlib import Path
-        # Add the src folder to the path inside the worker process
-        src = Path(__file__).resolve().parents[1] / "src"
-        if str(src) not in sys.path:
-            sys.path.insert(0, str(src))
+        import sys as _sys
+
+        if src not in _sys.path:
+            _sys.path.insert(0, src)
         from quad_loco.env import QuadrupedVelocityEnv
+
         env = QuadrupedVelocityEnv(easy=easy, render_mode=render_mode)
         env.reset(seed=seed + idx)
         return env
+
     return _init
 
-    
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--config", type=Path, default=ROOT / "configs" / "ppo_cpu.yaml")
@@ -119,13 +68,11 @@ def main() -> int:
     from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv, VecMonitor, VecNormalize
 
     use_subproc = cfg.get("vec_env") == "subproc" and n_envs > 1
+    factories = [make_env(src, easy, seed, i) for i in range(n_envs)]
     if use_subproc:
-        env = SubprocVecEnv(
-            [make_env(src, easy, seed, i) for i in range(n_envs)],
-            start_method="forkserver",
-        )
+        env = SubprocVecEnv(factories, start_method="forkserver")
     else:
-        env = DummyVecEnv([make_env(src, easy, seed, i) for i in range(n_envs)])
+        env = DummyVecEnv(factories)
     env = VecMonitor(env)
     if cfg.get("normalize", True):
         env = VecNormalize(env, norm_obs=True, norm_reward=True, clip_obs=10.0)
@@ -172,7 +119,7 @@ def main() -> int:
     model.learn(total_timesteps=timesteps, callback=callbacks, tb_log_name=run_name)
     # SB3 appends .zip; pass the stem so we do not get final_model.zip.zip
     model_stem = ckpt_dir / "final_model"
-    model.save(model_stem)
+    model.save(str(model_stem))
     saved = Path(str(model_stem) + ".zip")
     if not saved.is_file() and model_stem.is_file():
         saved = model_stem
