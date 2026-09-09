@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import os
 import sys
+import time
 import warnings
 from pathlib import Path
 
@@ -15,6 +16,13 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "3")
 warnings.filterwarnings("ignore", message="Gym has been unmaintained")
+warnings.filterwarnings("ignore", message="You are trying to run PPO on the GPU")
+
+T0 = time.time()
+
+
+def log(msg: str) -> None:
+    print(f"[{time.time() - T0:6.1f}s] {msg}", flush=True)
 
 
 def main() -> int:
@@ -23,6 +31,7 @@ def main() -> int:
     parser.add_argument("--out", type=Path, default=None)
     args = parser.parse_args()
 
+    log("importing sb3")
     from stable_baselines3 import PPO
 
     from quad_loco.checkpoints import resolve_sb3_zip
@@ -32,12 +41,15 @@ def main() -> int:
     load_arg = str(model_path)
     if load_arg.endswith(".zip"):
         load_arg = load_arg[:-4]
+    log(f"loading {load_arg} on cpu")
     model = PPO.load(load_arg, device="cpu")
     out = args.out or model_path.with_name("policy.onnx")
+    log(f"tracing ONNX -> {out}")
     export_sb3_onnx(model, out)
+    log("verifying ONNX vs PyTorch")
     dummy = np.zeros(48, dtype=np.float32)
     err = verify_onnx(out, model, dummy)
-    print(f"wrote {out}  max_abs_err={err:.6g}")
+    log(f"wrote {out}  max_abs_err={err:.6g}")
     return 0 if err < 1e-4 else 1
 
 
