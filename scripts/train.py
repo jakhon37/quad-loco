@@ -69,6 +69,7 @@ def main() -> int:
 
     from stable_baselines3 import PPO
     from stable_baselines3.common.callbacks import CheckpointCallback, EvalCallback
+    from stable_baselines3.common.logger import configure
     from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv, VecMonitor, VecNormalize
 
     use_subproc = cfg.get("vec_env") == "subproc" and n_envs > 1
@@ -101,7 +102,7 @@ def main() -> int:
         vf_coef=float(cfg.get("vf_coef", 0.5)),
         max_grad_norm=float(cfg.get("max_grad_norm", 1.0)),
         policy_kwargs={"net_arch": list(cfg.get("net_arch", [256, 256]))},
-        tensorboard_log=str(log_dir / "tb"),
+        tensorboard_log=None,
         verbose=0,
         seed=seed,
         device=device,
@@ -112,6 +113,10 @@ def main() -> int:
 
     ckpt_dir = log_dir / run_name
     ckpt_dir.mkdir(parents=True, exist_ok=True)
+    log_formats = ["csv", "tensorboard"]
+    if verbose:
+        log_formats.insert(0, "stdout")
+    model.set_logger(configure(str(ckpt_dir), log_formats))
     from quad_loco.train_callbacks import CompactLogCallback
 
     callbacks = [
@@ -134,15 +139,15 @@ def main() -> int:
     ]
     print(
         f"train {timesteps} steps | {n_envs} envs | device={device} | "
-        f"run={run_name} | every {cfg.get('print_every', 10)} rollouts "
-        f"(full tables: --verbose 1, TensorBoard still on)",
+        f"run={run_name} | every {cfg.get('print_every', 10)} rollouts\n"
+        f"full log: {ckpt_dir / 'progress.csv'}  tensorboard: {ckpt_dir}",
         flush=True,
     )
     learn_kw = dict(
         total_timesteps=timesteps,
         callback=callbacks,
         tb_log_name=run_name,
-        log_interval=max(int(cfg.get("print_every", 10)), 1) if verbose else 1_000_000,
+        log_interval=1,
     )
     try:
         model.learn(progress_bar=True, **learn_kw)
@@ -158,6 +163,9 @@ def main() -> int:
     if cfg.get("normalize", True):
         env.save(str(ckpt_dir / "vecnormalize.pkl"))
     print(f"saved {saved}")
+    csv_path = ckpt_dir / "progress.csv"
+    if csv_path.is_file():
+        print(f"full metrics csv: {csv_path}")
     env.close()
     eval_env.close()
     return 0

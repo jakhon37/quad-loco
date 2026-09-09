@@ -85,6 +85,20 @@ python scripts/train.py --config configs/ppo_colab.yaml --run-name colab_easy
 
 Physics stays on CPU. MLP PPO is also run on CPU (faster than CUDA for this policy). 1.5M steps with 8 env processes is a few hours on Colab.
 
+The terminal shows a progress bar plus one line every 10 rollouts. **Every PPO metric** is still written to disk:
+
+```
+logs/<run>/progress.csv           # spreadsheet (rew, len, kl, ev, losses, …)
+logs/<run>/events.out.tfevents*   # TensorBoard
+logs/<run>/eval/evaluations.npz   # periodic eval scores
+```
+
+```bash
+tensorboard --logdir logs/colab_easy
+```
+
+`--verbose 1` restores the old tables in the terminal.
+
 The `Gym has been unmaintained` warning is the old `gym` package that Colab preinstalls. This project uses **Gymnasium**. The notebook uninstalls `gym`.
 
 ## Eval / export
