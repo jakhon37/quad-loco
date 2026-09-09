@@ -15,5 +15,5 @@ def test_resolve_strips_double_zip(tmp_path: Path):
 
 
 def test_resolve_missing(tmp_path: Path):
-    with pytest.raises(FileNotFoundError, match="Training probably failed"):
+    with pytest.raises(FileNotFoundError, match="--run-name must match"):
         resolve_sb3_zip(tmp_path / "final_model.zip")

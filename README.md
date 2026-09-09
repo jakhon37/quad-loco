@@ -94,9 +94,11 @@ tensorboard --logdir logs/<run>
 
 ## Eval and export
 
+Use the path printed at the end of training (`saved .../final_model.zip`). After the smoke run that is `logs/smoke/`:
+
 ```bash
-python scripts/eval.py --model logs/local_walk/final_model.zip --easy --command 0.5 0 0 --video videos/walk.mp4
-python scripts/export_onnx.py --model logs/local_walk/final_model.zip --out logs/local_walk/policy.onnx
+python scripts/eval.py --model logs/smoke/final_model.zip --easy --command 0.5 0 0 --video videos/walk.mp4
+python scripts/export_onnx.py --model logs/smoke/final_model.zip --out logs/smoke/policy.onnx
 ```
 
 Eval writes a still (`*_preview.png`) and an MP4 when rendering is available (OSMesa on headless Linux). Keep `vecnormalize.pkl` next to the zip; observations were normalized during training.
