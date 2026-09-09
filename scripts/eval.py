@@ -61,7 +61,7 @@ def main() -> int:
     load_arg = str(model_path)
     if load_arg.endswith(".zip"):
         load_arg = load_arg[:-4]
-    model = PPO.load(load_arg, env=venv)
+    model = PPO.load(load_arg, env=venv, device="cpu")
     raw = venv.venv.envs[0] if hasattr(venv, "venv") else venv.envs[0]
     if hasattr(raw, "unwrapped"):
         raw = raw.unwrapped

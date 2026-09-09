@@ -20,8 +20,9 @@ class ActorOnnx(nn.Module):
 def export_sb3_onnx(model, path: Path, obs_dim: int = 48) -> Path:
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
+    policy = model.policy.to("cpu").eval()
     dummy = torch.zeros(1, obs_dim, dtype=torch.float32)
-    actor = ActorOnnx(model.policy.eval()).eval()
+    actor = ActorOnnx(policy).eval()
     kwargs = {
         "input_names": ["obs"],
         "output_names": ["actions"],
@@ -44,7 +45,9 @@ def verify_onnx(path: Path, model, obs: np.ndarray) -> float:
     onnx_out = sess.run(["actions"], {"obs": obs.astype(np.float32)[None, :]})[0][0]
     with torch.no_grad():
         torch_out = (
-            ActorOnnx(model.policy)(torch.as_tensor(obs[None, :], dtype=torch.float32))
+            ActorOnnx(model.policy.to("cpu").eval())(
+                torch.as_tensor(obs[None, :], dtype=torch.float32)
+            )
             .cpu()
             .numpy()[0]
         )

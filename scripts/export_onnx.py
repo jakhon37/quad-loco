@@ -32,7 +32,7 @@ def main() -> int:
     load_arg = str(model_path)
     if load_arg.endswith(".zip"):
         load_arg = load_arg[:-4]
-    model = PPO.load(load_arg)
+    model = PPO.load(load_arg, device="cpu")
     out = args.out or model_path.with_name("policy.onnx")
     export_sb3_onnx(model, out)
     dummy = np.zeros(48, dtype=np.float32)
