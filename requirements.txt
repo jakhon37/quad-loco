@@ -12,4 +12,6 @@ tensorboard
 onnx
 onnxscript
 onnxruntime
+tqdm
+rich
 pytest

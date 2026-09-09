@@ -53,6 +53,7 @@ def main() -> int:
     parser.add_argument("--log-dir", type=Path, default=ROOT / "logs")
     parser.add_argument("--run-name", default=None)
     parser.add_argument("--easy", action="store_true")
+    parser.add_argument("--verbose", type=int, default=None, help="0=quiet+bar, 1=SB3 tables")
     args = parser.parse_args()
 
     cfg = load_config(args.config)
@@ -101,15 +102,26 @@ def main() -> int:
         max_grad_norm=float(cfg.get("max_grad_norm", 1.0)),
         policy_kwargs={"net_arch": list(cfg.get("net_arch", [256, 256]))},
         tensorboard_log=str(log_dir / "tb"),
-        verbose=1,
+        verbose=0,
         seed=seed,
         device=device,
     )
 
+    verbose = args.verbose if args.verbose is not None else int(cfg.get("verbose", 0))
+    model.verbose = verbose
+
     ckpt_dir = log_dir / run_name
     ckpt_dir.mkdir(parents=True, exist_ok=True)
+    from quad_loco.train_callbacks import CompactLogCallback
+
     callbacks = [
-        CheckpointCallback(save_freq=max(50_000 // n_envs, 1), save_path=str(ckpt_dir), name_prefix="ckpt"),
+        CompactLogCallback(every=int(cfg.get("print_every", 10)), total_timesteps=timesteps),
+        CheckpointCallback(
+            save_freq=max(50_000 // n_envs, 1),
+            save_path=str(ckpt_dir),
+            name_prefix="ckpt",
+            verbose=0,
+        ),
         EvalCallback(
             eval_env,
             best_model_save_path=str(ckpt_dir / "best"),
@@ -117,9 +129,26 @@ def main() -> int:
             eval_freq=max(25_000 // n_envs, 1),
             n_eval_episodes=3,
             deterministic=True,
+            verbose=0,
         ),
     ]
-    model.learn(total_timesteps=timesteps, callback=callbacks, tb_log_name=run_name)
+    print(
+        f"train {timesteps} steps | {n_envs} envs | device={device} | "
+        f"run={run_name}\nprogress bar on; one-line stats every "
+        f"{cfg.get('print_every', 10)} rollouts",
+        flush=True,
+    )
+    learn_kw = dict(
+        total_timesteps=timesteps,
+        callback=callbacks,
+        tb_log_name=run_name,
+        log_interval=max(int(cfg.get("print_every", 10)), 1) if verbose else 1_000_000,
+    )
+    try:
+        model.learn(progress_bar=True, **learn_kw)
+    except ImportError:
+        print("install tqdm+rich for a progress bar: pip install tqdm rich", flush=True)
+        model.learn(progress_bar=False, **learn_kw)
     # SB3 appends .zip; pass the stem so we do not get final_model.zip.zip
     model_stem = ckpt_dir / "final_model"
     model.save(str(model_stem))

@@ -18,3 +18,5 @@ vf_coef: 0.5
 max_grad_norm: 1.0
 net_arch: [256, 256]
 total_timesteps: 1500000
+verbose: 0
+print_every: 10

@@ -23,6 +23,8 @@ dependencies = [
     "onnx",
     "onnxscript",
     "onnxruntime",
+    "tqdm",
+    "rich",
 ]
 
 [project.optional-dependencies]
