@@ -6,7 +6,6 @@ from __future__ import annotations
 import argparse
 import os
 import sys
-import time
 import warnings
 from pathlib import Path
 
@@ -18,11 +17,13 @@ os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "3")
 warnings.filterwarnings("ignore", message="Gym has been unmaintained")
 warnings.filterwarnings("ignore", message="You are trying to run PPO on the GPU")
 
-T0 = time.time()
+from quad_loco.runtime import RuntimeClock  # noqa: E402
+
+CLOCK = RuntimeClock(heartbeat_s=15)
 
 
 def log(msg: str) -> None:
-    print(f"[{time.time() - T0:6.1f}s] {msg}", flush=True)
+    CLOCK.log(msg)
 
 
 def main() -> int:
@@ -50,6 +51,7 @@ def main() -> int:
     dummy = np.zeros(48, dtype=np.float32)
     err = verify_onnx(out, model, dummy)
     log(f"wrote {out}  max_abs_err={err:.6g}")
+    CLOCK.stop()
     return 0 if err < 1e-4 else 1
 
 

@@ -19,14 +19,15 @@ sys.path.insert(0, str(ROOT / "src"))
 os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "3")
 
 from quad_loco.gl_setup import configure_mujoco_gl  # noqa: E402
+from quad_loco.runtime import RuntimeClock  # noqa: E402
 
-T0 = time.time()
+CLOCK = RuntimeClock(heartbeat_s=15)
 GL = configure_mujoco_gl()
 FAILED = 0
 
 
 def log(msg: str) -> None:
-    print(f"[{time.time() - T0:6.1f}s] {msg}", flush=True)
+    CLOCK.log(msg)
 
 
 def ok(name: str, detail: str = "") -> None:
@@ -117,8 +118,10 @@ def main() -> int:
     env.close()
     if FAILED:
         log(f"DONE with {FAILED} failure(s)")
+        CLOCK.stop()
         return 1
     log("DONE all checks passed")
+    CLOCK.stop()
     return 0
 
 

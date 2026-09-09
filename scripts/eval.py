@@ -17,13 +17,14 @@ warnings.filterwarnings("ignore", message="Gym has been unmaintained")
 warnings.filterwarnings("ignore", message="You are trying to run PPO on the GPU")
 
 from quad_loco.gl_setup import configure_mujoco_gl, save_rollout_visuals  # noqa: E402
+from quad_loco.runtime import RuntimeClock  # noqa: E402
 
-T0 = time.time()
+CLOCK = RuntimeClock(heartbeat_s=15)
 GL = configure_mujoco_gl()
 
 
 def log(msg: str) -> None:
-    print(f"[{time.time() - T0:6.1f}s] {msg}", flush=True)
+    CLOCK.log(msg)
 
 
 log(f"python={sys.version.split()[0]}  MUJOCO_GL={GL}")
@@ -157,6 +158,7 @@ def main() -> int:
         log("no frames captured; apt-get install libosmesa6")
     venv.close()
     log("eval done")
+    CLOCK.stop()
     return 0
 
 

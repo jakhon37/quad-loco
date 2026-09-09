@@ -5,6 +5,8 @@ import time
 import numpy as np
 from stable_baselines3.common.callbacks import BaseCallback
 
+from quad_loco.runtime import format_hms
+
 
 def _fmt(value: float, spec: str) -> str:
     if value is None or (isinstance(value, float) and not np.isfinite(value)):
@@ -20,7 +22,7 @@ class CompactLogCallback(BaseCallback):
     """
 
     HEADER = (
-        "steps | fps  rew  len | ev  kl  ent   "
+        "runtime | steps | fps  rew  len | ev  kl  ent   "
         "# rew↑  len→1000  ev→1  kl~0.01  ent should not crash to 0"
     )
 
@@ -47,8 +49,10 @@ class CompactLogCallback(BaseCallback):
         if started:
             elapsed = max((time.time_ns() - started) / 1e9, 1e-8)
             fps = self.num_timesteps / elapsed
+            wall = format_hms(elapsed)
         else:
             fps = float("nan")
+            wall = "—"
         buf = getattr(self.model, "ep_info_buffer", None)
         if buf:
             rew = float(np.mean([ep["r"] for ep in buf]))
@@ -63,7 +67,7 @@ class CompactLogCallback(BaseCallback):
         ent = kv.get("train/entropy_loss", float("nan"))
         total = f"/{self.total_timesteps}" if self.total_timesteps else ""
         print(
-            f"{self.num_timesteps:>8}{total} | "
+            f"[runtime {wall}] {self.num_timesteps:>8}{total} | "
             f"fps={_fmt(fps, '.0f')}  rew={_fmt(rew, '.1f')}  len={_fmt(length, '.0f')} | "
             f"ev={_fmt(ev, '.2f')}  kl={_fmt(kl, '.3f')}  ent={_fmt(ent, '.2f')}",
             flush=True,
