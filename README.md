@@ -1,16 +1,28 @@
 # quad-loco
 
-![PD stand in MuJoCo](docs/stand.png)
+Velocity-tracking locomotion for a custom 12-DoF quadruped in [MuJoCo](https://mujoco.org/). A PPO policy (Stable-Baselines3) outputs joint targets at 50 Hz; a PD controller applies torques. Export is ONNX.
 
-Velocity-tracking locomotion for a custom 12-DoF quadruped in [MuJoCo](https://mujoco.org/), trained with PPO (Stable-Baselines3) and exported to ONNX.
+No NVIDIA GPU is required. Physics and the MLP both run on CPU.
 
-No NVIDIA GPU is required. Physics and the MLP policy both run on CPU.
+**PD stand (no learned policy)** — MuJoCo interactive viewer:
+
+![PD stand in the MuJoCo viewer](docs/stand_v2.png)
+
+<video src="docs/stand.mp4" width="640" autoplay loop muted playsinline controls>
+  <a href="docs/stand.mp4">stand.mp4</a>
+</video>
+
+**Smoke policy rollout** (8k PPO steps, command `v_x = 0.5` m/s — still a stand, not a gait):
+
+<video src="docs/policy_smoke.mp4" width="640" autoplay loop muted playsinline controls>
+  <a href="docs/policy_smoke.mp4">policy_smoke.mp4</a>
+</video>
 
 ```
 URDF → MJCF → Gymnasium env → PPO → eval / video → ONNX
 ```
 
-What is trained, how the loop works, and which library does what: **[docs/OVERVIEW.md](docs/OVERVIEW.md)**.
+Details: **[docs/OVERVIEW.md](docs/OVERVIEW.md)**.
 
 ## Robot
 
@@ -48,7 +60,7 @@ The scene in `robot/mjcf/` is ready to use. Rebuild after changing the URDF:
 python -m quad_loco.convert_urdf
 python scripts/stand.py          # PD hold (no learned policy)
 python -u scripts/check.py       # timed imports + env step (no trained policy)
-python -u scripts/check.py --render   # also probe one off-screen frame
+python -u scripts/check.py --render
 python -m pytest tests -q
 ```
 
@@ -67,22 +79,17 @@ Training is **optional and local-first**. A 1.5M-step run is on the order of 30�
 **Local**
 
 ```bash
-# short check
 python scripts/train.py --config configs/ppo_cpu.yaml --timesteps 8192 --run-name smoke
-
-# full run (edit total_timesteps in the yaml, or pass --timesteps)
 python scripts/train.py --config configs/ppo_cpu.yaml --run-name local_walk
 ```
 
-**Colab (optional)** — use it if you want the job off your laptop: longer unattended session, more CPU cores for 8 parallel envs (`configs/ppo_colab.yaml`). A GPU runtime is unnecessary for this MLP.
-
-Colab’s default **Python 3.13** can hang for a long time on `import stable_baselines3`. If `scripts/check.py` sits there more than about a minute, stop the runtime and train locally with Python 3.12.
+**Colab (optional)** — unattended job, extra CPU cores for 8 parallel envs (`configs/ppo_colab.yaml`). A GPU runtime is unnecessary. Colab **Python 3.13** can hang on `import stable_baselines3`; if `scripts/check.py` sits more than about a minute, use local Python 3.12.
 
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/jakhon37/quad-loco/blob/main/notebooks/colab_train.ipynb)
 
-Opening the notebook from GitHub does not copy the repo; the first cell clones it. A CPU runtime is enough.
+The first notebook cell clones this repo. A CPU runtime is enough.
 
-Console output is a progress bar plus one line every few rollouts (`rew`, `len`, `ev`, `kl`, `ent`). Full metrics are always written to disk:
+Console: progress bar plus one line every few rollouts (`rew`, `len`, `ev`, `kl`, `ent`). Full metrics:
 
 ```
 logs/<run>/progress.csv
@@ -94,26 +101,27 @@ logs/<run>/eval/evaluations.npz
 tensorboard --logdir logs/<run>
 ```
 
-`--verbose 1` prints the full Stable-Baselines3 tables in the terminal.
+`--verbose 1` prints the full Stable-Baselines3 tables.
 
 ## Eval and export
 
-Use the path printed at the end of training (`saved .../final_model.zip`). After the smoke run that is `logs/smoke/`:
+`--run-name smoke` writes `logs/smoke/final_model.zip`:
 
 ```bash
 python scripts/eval.py --model logs/smoke/final_model.zip --easy --command 0.5 0 0 --video videos/walk.mp4
 python scripts/export_onnx.py --model logs/smoke/final_model.zip --out logs/smoke/policy.onnx
 ```
 
-Eval writes a still (`*_preview.png`) and an MP4 when rendering is available (OSMesa on headless Linux). Keep `vecnormalize.pkl` next to the zip; observations were normalized during training.
+Keep `vecnormalize.pkl` next to the zip. Eval writes an MP4 and `*_preview.png` when rendering is available.
 
 ## Layout
 
 ```
+docs/           overview, stand screenshot, demo videos
 robot/          URDF, STL meshes, MJCF scene
 src/quad_loco/  environment, converter, export
-scripts/        stand, train, eval, export, smoke
-configs/        PPO hyperparameters (local and Colab)
+scripts/        stand, train, eval, export, check
+configs/        PPO hyperparameters
 notebooks/      optional Colab notebook
 tests/
 ```
