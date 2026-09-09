@@ -9,12 +9,17 @@ import sys
 import warnings
 from pathlib import Path
 
+# Headless Colab/Linux has no DISPLAY. Set this before importing mujoco.
+if sys.platform == "linux" and not os.environ.get("DISPLAY"):
+    os.environ.setdefault("MUJOCO_GL", "egl")
+
 import numpy as np
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "3")
 warnings.filterwarnings("ignore", message="Gym has been unmaintained")
+warnings.filterwarnings("ignore", message="You are trying to run PPO on the GPU")
 
 
 def main() -> int:
@@ -36,9 +41,8 @@ def main() -> int:
 
     model_path = resolve_sb3_zip(args.model)
     command = tuple(args.command) if args.command else None
-    render_mode = "rgb_array" if args.video else None
-    if args.video and sys.platform == "linux":
-        os.environ.setdefault("MUJOCO_GL", "egl")
+    want_video = args.video is not None
+    render_mode = "rgb_array" if want_video else None
 
     def _make():
         return QuadrupedVelocityEnv(easy=args.easy, command=command, render_mode=render_mode)
@@ -78,14 +82,21 @@ def main() -> int:
             cmd = infos[0].get("command")
             if lin is not None and cmd is not None:
                 vx_err.append(abs(float(lin[0]) - float(cmd[0])))
-            if args.video:
-                frames.append(raw.render())
+            if want_video:
+                try:
+                    frame = raw.render()
+                    if frame is not None:
+                        frames.append(frame)
+                except Exception as exc:
+                    print(f"video disabled ({type(exc).__name__}: {exc})")
+                    print("hint: on Colab this is normal without EGL; metrics still count")
+                    want_video = False
             done = bool(dones[0])
         returns.append(ep_ret)
         print(f"episode {ep}: return={ep_ret:.2f} height={infos[0].get('base_height')}")
 
     print(f"mean_return={np.mean(returns):.2f} mean_|vx-cmd|={np.mean(vx_err) if vx_err else float('nan'):.3f}")
-    if args.video:
+    if want_video and frames:
         import imageio.v2 as imageio
 
         args.video.parent.mkdir(parents=True, exist_ok=True)

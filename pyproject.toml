@@ -21,6 +21,7 @@ dependencies = [
     "imageio-ffmpeg",
     "tensorboard",
     "onnx",
+    "onnxscript",
     "onnxruntime",
 ]
 

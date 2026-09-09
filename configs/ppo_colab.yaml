@@ -1,9 +1,10 @@
-# Google Colab T4/L4: CPU physics x 8 processes, GPU for PPO.
+# Colab: 8 CPU MuJoCo workers. MLP PPO is faster on CPU than CUDA
+# (SB3's own guidance). Physics is CPU either way.
 seed: 1
 easy: true
 n_envs: 8
 vec_env: subproc
-device: cuda
+device: cpu
 normalize: true
 n_steps: 512
 batch_size: 1024

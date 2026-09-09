@@ -21,16 +21,19 @@ def export_sb3_onnx(model, path: Path, obs_dim: int = 48) -> Path:
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     dummy = torch.zeros(1, obs_dim, dtype=torch.float32)
-    actor = ActorOnnx(model.policy).eval()
-    torch.onnx.export(
-        actor,
-        dummy,
-        str(path),
-        input_names=["obs"],
-        output_names=["actions"],
-        opset_version=17,
-        dynamic_axes={"obs": {0: "batch"}, "actions": {0: "batch"}},
-    )
+    actor = ActorOnnx(model.policy.eval()).eval()
+    kwargs = {
+        "input_names": ["obs"],
+        "output_names": ["actions"],
+        "opset_version": 17,
+        "dynamic_axes": {"obs": {0: "batch"}, "actions": {0: "batch"}},
+    }
+    # PyTorch 2.8+ defaults to the onnxscript exporter. Prefer the legacy
+    # exporter so Colab works without an extra package; fall back if needed.
+    try:
+        torch.onnx.export(actor, dummy, str(path), dynamo=False, **kwargs)
+    except TypeError:
+        torch.onnx.export(actor, dummy, str(path), **kwargs)
     return path
 
 

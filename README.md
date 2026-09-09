@@ -83,7 +83,9 @@ python -m quad_loco.convert_urdf
 python scripts/train.py --config configs/ppo_colab.yaml --run-name colab_easy
 ```
 
-Physics stays on CPU even on Colab; the GPU only accelerates PPO. 1.5M steps with 8 env processes is a few hours on a T4.
+Physics stays on CPU. MLP PPO is also run on CPU (faster than CUDA for this policy). 1.5M steps with 8 env processes is a few hours on Colab.
+
+The `Gym has been unmaintained` warning is the old `gym` package that Colab preinstalls. This project uses **Gymnasium**. The notebook uninstalls `gym`.
 
 ## Eval / export
 

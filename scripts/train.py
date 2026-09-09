@@ -30,6 +30,9 @@ def make_env(src: str, easy: bool, seed: int, idx: int, render_mode=None):
     def _init():
         import sys as _sys
 
+        import warnings as _warnings
+
+        _warnings.filterwarnings("ignore", message="Gym has been unmaintained")
         if src not in _sys.path:
             _sys.path.insert(0, src)
         from quad_loco.env import QuadrupedVelocityEnv
