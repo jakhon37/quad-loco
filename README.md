@@ -1,37 +1,34 @@
-# Custom quadruped locomotion (MuJoCo)
+# quad-loco
 
 ![PD stand in MuJoCo](docs/stand.png)
 
-Train a **custom 12-DoF quadruped** (not Unitree) to track velocity commands with PPO.
+Velocity-tracking locomotion for a custom 12-DoF quadruped in [MuJoCo](https://mujoco.org/), trained with PPO (Stable-Baselines3) and exported to ONNX.
 
-**URDF → MuJoCo MJCF → Gymnasium env → Stable-Baselines3 PPO → ONNX**
+No NVIDIA GPU is required. Physics and the MLP policy both run on CPU.
 
-| Where | What it is for |
-|---|---|
-| Laptop / Mac, no NVIDIA GPU | Convert the robot, PD-stand, debug rewards, short CPU trains, play a policy |
-| Google Colab T4 / L4 | The real training run |
-| Isaac Sim / Isaac Lab | Not required. Optional later on a rented RTX box |
-
-This is a [portfolio project](https://github.com/jakhon37/quad-loco). The robot meshes started from an [Isaac Lab custom-quadruped tutorial](https://www.youtube.com/watch?v=z62oU4hM1xM); the training stack here is MuJoCo so it actually runs without an RTX workstation.
+```
+URDF → MJCF → Gymnasium env → PPO → eval / video → ONNX
+```
 
 ## Robot
 
 | | |
 |---|---|
-| DoF | 12 (hip / thigh / calf × 4) |
-| Trunk mass | 9.7 kg |
-| Total mass | ~22 kg |
-| Stand height | ~0.65 m (PD hold, feet on the ground) |
-| Control | 50 Hz joint-position PD (`kp=100`, `kv=3`, `τ≤45 N·m`) |
-| Task | Track `(vx, vy, yaw_rate)` on flat ground |
+| DoF | 12 (hip, thigh, calf × 4) |
+| Mass | ~22 kg (trunk 9.7 kg) |
+| Stand height | ~0.65 m |
+| Control | 50 Hz joint-position PD (`kp=100`, `kv=3`, `τ ≤ 45 N·m`) |
+| Task | Track base velocity `(v_x, v_y, ω_z)` on flat ground |
 
-Observation (48 dims): body linear velocity (3), angular velocity (3), projected gravity (3), command (3), joint pos relative to default (12), joint vel (12), last action (12).
+**Observation** (48): body linear velocity (3), angular velocity (3), projected gravity (3), command (3), joint position relative to default (12), joint velocity (12), last action (12).
 
-Action (12 dims): `target = default_pose + 0.25 * action`.
+**Action** (12): `q_target = q_default + 0.25 · a`, `a ∈ [-1, 1]`.
+
+Meshes and URDF are adapted from a public custom-quadruped model; this repository is the MuJoCo training and export stack.
 
 ## Setup
 
-Python 3.10–3.12. On **Intel macOS**, pin MuJoCo 3.10 (3.11+ dropped x86_64 wheels).
+Python 3.10–3.12. On Intel macOS, MuJoCo must be **3.10.x** (later wheels dropped x86_64).
 
 ```bash
 git clone https://github.com/jakhon37/quad-loco.git
@@ -43,93 +40,70 @@ pip install -e .
 export PYTHONPATH=src
 ```
 
-The MuJoCo scene is already in `robot/mjcf/`. Rebuild from the URDF if you change the robot:
+The scene in `robot/mjcf/` is ready to use. Rebuild after changing the URDF:
 
 ```bash
 python -m quad_loco.convert_urdf
-python scripts/stand.py          # PD hold, no learned policy
+python scripts/stand.py          # PD hold (no learned policy)
 python -m pytest tests -q
 ```
 
-`scripts/stand.py --viewer` opens the interactive viewer if you have a display.
+`scripts/stand.py --viewer` opens an interactive window when a display is available.
 
 ## Train
 
-**Smoke (minutes, CPU):**
+Training is **optional and local-first**. A 1.5M-step run is on the order of 30–40 minutes on a laptop CPU. Google Colab is not required.
+
+**Local**
 
 ```bash
-python scripts/smoke.py
-python scripts/train.py --config configs/ppo_cpu.yaml --timesteps 4096 --run-name smoke
+# short check
+python scripts/train.py --config configs/ppo_cpu.yaml --timesteps 8192 --run-name smoke
+
+# full run (edit total_timesteps in the yaml, or pass --timesteps)
+python scripts/train.py --config configs/ppo_cpu.yaml --run-name local_walk
 ```
 
-**Overnight laptop (CPU, easy forward-only commands):**
-
-```bash
-python scripts/train.py --config configs/ppo_cpu.yaml --run-name cpu_easy
-```
-
-Verified on an Intel Mac with no GPU: PD stand holds at **0.62 m**, tests pass, PPO runs at **~640 FPS**, ONNX matches PyTorch to `3e-8`. A few thousand CPU steps already survive a 20 s stand. A forward walk needs the Colab run (~1.5M steps).
-
-**Colab (the practical training run):**
+**Colab (optional)** — use it if you want the job off your laptop: longer unattended session, more CPU cores for 8 parallel envs (`configs/ppo_colab.yaml`). A GPU runtime is unnecessary for this MLP.
 
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/jakhon37/quad-loco/blob/main/notebooks/colab_train.ipynb)
 
-1. Open the badge (or `notebooks/colab_train.ipynb`) and set Runtime → **T4 GPU**.
-2. Run all cells. The first cell clones this repo into `/content/quad-loco` (opening the notebook from GitHub does not copy the rest of the project).
+Opening the notebook from GitHub does not copy the repo; the first cell clones it. A CPU runtime is enough.
 
-```bash
-pip install -r requirements.txt
-python -m quad_loco.convert_urdf
-python scripts/train.py --config configs/ppo_colab.yaml --run-name colab_easy
-```
-
-Physics stays on CPU. MLP PPO is also run on CPU (faster than CUDA for this policy). 1.5M steps with 8 env processes is a few hours on Colab.
-
-The terminal shows a progress bar plus one line every 10 rollouts. **Every PPO metric** is still written to disk:
+Console output is a progress bar plus one line every few rollouts (`rew`, `len`, `ev`, `kl`, `ent`). Full metrics are always written to disk:
 
 ```
-logs/<run>/progress.csv           # spreadsheet (rew, len, kl, ev, losses, …)
-logs/<run>/events.out.tfevents*   # TensorBoard
-logs/<run>/eval/evaluations.npz   # periodic eval scores
+logs/<run>/progress.csv
+logs/<run>/events.out.tfevents*
+logs/<run>/eval/evaluations.npz
 ```
 
 ```bash
-tensorboard --logdir logs/colab_easy
+tensorboard --logdir logs/<run>
 ```
 
-`--verbose 1` restores the old tables in the terminal.
+`--verbose 1` prints the full Stable-Baselines3 tables in the terminal.
 
-The `Gym has been unmaintained` warning is the old `gym` package that Colab preinstalls. This project uses **Gymnasium**. The notebook uninstalls `gym`.
-
-## Eval / export
+## Eval and export
 
 ```bash
-python scripts/eval.py --model logs/cpu_easy/final_model.zip --easy --command 0.5 0 0 --video videos/walk.mp4
-python scripts/export_onnx.py --model logs/cpu_easy/final_model.zip --out logs/cpu_easy/policy.onnx
+python scripts/eval.py --model logs/local_walk/final_model.zip --easy --command 0.5 0 0 --video videos/walk.mp4
+python scripts/export_onnx.py --model logs/local_walk/final_model.zip --out logs/local_walk/policy.onnx
 ```
+
+Eval writes a still (`*_preview.png`) and an MP4 when rendering is available (OSMesa on headless Linux). Keep `vecnormalize.pkl` next to the zip; observations were normalized during training.
 
 ## Layout
 
 ```
-robot/          URDF, STL meshes, generated MJCF
-src/quad_loco/  env, URDF converter, ONNX export
-scripts/        stand / train / eval / export / smoke
-configs/        PPO hyperparameters (CPU and Colab)
-notebooks/      Colab training notebook
-tests/          env + model smoke tests
+robot/          URDF, STL meshes, MJCF scene
+src/quad_loco/  environment, converter, export
+scripts/        stand, train, eval, export, smoke
+configs/        PPO hyperparameters (local and Colab)
+notebooks/      optional Colab notebook
+tests/
 ```
 
-## Status
+## License
 
-Done:
-
-- Custom robot in MuJoCo with a holdable standing pose
-- Velocity-tracking Gymnasium env
-- Train / eval / ONNX pipeline
-- Colab notebook for GPU PPO
-
-Next slices worth adding:
-
-- Rough terrain and push recovery
-- A ROS 2 node that runs the ONNX policy (fits a Jetson stack)
-- Optional Isaac Lab comparison on a rented RTX box
+MIT. See [LICENSE](LICENSE).
