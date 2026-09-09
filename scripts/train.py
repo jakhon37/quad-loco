@@ -39,45 +39,59 @@ def load_config(path: Path) -> dict:
 #         return env
 
 #     return _init
-def make_env(env_id: str, easy: bool, seed: int, idx: int, render_mode=None):
+# def make_env(env_id: str, easy: bool, seed: int, idx: int, render_mode=None):
+#     def _init():
+#         import sys
+#         from pathlib import Path
+
+#         src = Path(__file__).resolve().parents[1] / "src"
+#         if str(src) not in sys.path:
+#             sys.path.insert(0, str(src))
+
+#         import gymnasium as gym
+#         import quad_loco  # noqa: F401
+
+#         env = gym.make(env_id, easy=easy, render_mode=render_mode)
+#         env.reset(seed=seed + idx)
+#         return env
+
+#     return _init
+
+
+# def make_env(env_id: str, easy: bool, seed: int, idx: int, render_mode=None):
+#     def _init():
+#         import sys
+#         from pathlib import Path
+
+#         root = Path(__file__).resolve().parents[1]
+#         src = str(root / "src")
+#         if src not in sys.path:
+#             sys.path.insert(0, src)
+
+#         import gymnasium as gym
+#         import quad_loco  # noqa: F401 - registers env ids as a side effect
+
+#         env = gym.make(env_id, easy=easy, render_mode=render_mode)
+#         env.reset(seed=seed + idx)
+#         return env
+
+#     return _init
+    
+def make_env(easy: bool, seed: int, idx: int, render_mode=None):
     def _init():
         import sys
         from pathlib import Path
-
+        # Add the src folder to the path inside the worker process
         src = Path(__file__).resolve().parents[1] / "src"
         if str(src) not in sys.path:
             sys.path.insert(0, str(src))
-
-        import gymnasium as gym
-        import quad_loco  # noqa: F401
-
-        env = gym.make(env_id, easy=easy, render_mode=render_mode)
+        from quad_loco.env import QuadrupedVelocityEnv
+        env = QuadrupedVelocityEnv(easy=easy, render_mode=render_mode)
         env.reset(seed=seed + idx)
         return env
-
     return _init
 
     
-def make_env(env_id: str, easy: bool, seed: int, idx: int, render_mode=None):
-    def _init():
-        import sys
-        from pathlib import Path
-
-        root = Path(__file__).resolve().parents[1]
-        src = str(root / "src")
-        if src not in sys.path:
-            sys.path.insert(0, src)
-
-        import gymnasium as gym
-        import quad_loco  # noqa: F401 - registers env ids as a side effect
-
-        env = gym.make(env_id, easy=easy, render_mode=render_mode)
-        env.reset(seed=seed + idx)
-        return env
-
-    return _init
-    
-
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--config", type=Path, default=ROOT / "configs" / "ppo_cpu.yaml")
