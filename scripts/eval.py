@@ -48,6 +48,8 @@ def main() -> int:
     import torch
 
     log(f"torch {torch.__version__}  cuda={torch.cuda.is_available()}")
+    if sys.version_info >= (3, 13):
+        log("WARN Python 3.13: next import (stable_baselines3) can hang on Colab. If silent >90s, stop and use local Python 3.12.")
     log("import stable_baselines3")
     from stable_baselines3 import PPO
     from stable_baselines3.common.vec_env import DummyVecEnv, VecNormalize

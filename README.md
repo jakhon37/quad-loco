@@ -74,6 +74,8 @@ python scripts/train.py --config configs/ppo_cpu.yaml --run-name local_walk
 
 **Colab (optional)** — use it if you want the job off your laptop: longer unattended session, more CPU cores for 8 parallel envs (`configs/ppo_colab.yaml`). A GPU runtime is unnecessary for this MLP.
 
+Colab’s default **Python 3.13** can hang for a long time on `import stable_baselines3`. If `scripts/check.py` sits there more than about a minute, stop the runtime and train locally with Python 3.12.
+
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/jakhon37/quad-loco/blob/main/notebooks/colab_train.ipynb)
 
 Opening the notebook from GitHub does not copy the repo; the first cell clones it. A CPU runtime is enough.

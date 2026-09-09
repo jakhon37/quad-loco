@@ -42,14 +42,29 @@ def fail(name: str, exc: BaseException) -> None:
     traceback.print_exc()
 
 
-def timed_import(label: str, module: str):
+def timed_import(label: str, module: str, timeout_s: int = 90):
+    log(f"import {label}  (fail if silent >{timeout_s}s)")
     t = time.time()
     try:
-        mod = __import__(module)
+        import signal
+
+        def _timeout(signum, frame):
+            raise TimeoutError(f"{label} import exceeded {timeout_s}s")
+
+        if hasattr(signal, "SIGALRM"):
+            signal.signal(signal.SIGALRM, _timeout)
+            signal.alarm(timeout_s)
+        try:
+            mod = __import__(module)
+        finally:
+            if hasattr(signal, "SIGALRM"):
+                signal.alarm(0)
         ok(label, f"{getattr(mod, '__version__', '')}  {time.time() - t:.1f}s")
         return mod
     except Exception as exc:
         fail(label, exc)
+        if "stable_baselines3" in module or "Timeout" in type(exc).__name__:
+            log("Colab Python 3.13 often hangs here. Stop the cell and run locally with Python 3.12.")
         return None
 
 
@@ -62,13 +77,16 @@ def main() -> int:
     log(f"cwd={Path.cwd()}  MUJOCO_GL={GL}")
     log(f"repo={ROOT}  src_exists={(ROOT / 'src' / 'quad_loco').is_dir()}")
 
+    if sys.version_info >= (3, 13):
+        log("WARN Python 3.13: stable_baselines3 import may hang on Colab. Local 3.12 is the supported path.")
+
     timed_import("numpy", "numpy")
     timed_import("yaml", "yaml")
     timed_import("gymnasium", "gymnasium")
-    timed_import("torch", "torch")
-    timed_import("stable_baselines3", "stable_baselines3")
     timed_import("mujoco", "mujoco")
     timed_import("onnx", "onnx")
+    timed_import("torch", "torch")
+    timed_import("stable_baselines3", "stable_baselines3", timeout_s=90)
 
     t = time.time()
     try:
