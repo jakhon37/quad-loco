@@ -6,17 +6,38 @@ import numpy as np
 from stable_baselines3.common.callbacks import BaseCallback
 
 
+def _fmt(value: float, spec: str) -> str:
+    if value is None or (isinstance(value, float) and not np.isfinite(value)):
+        return "—"
+    return format(value, spec)
+
+
 class CompactLogCallback(BaseCallback):
-    """One-line status every N rollouts instead of SB3's full tables."""
+    """One-line status every N rollouts instead of SB3's full tables.
+
+    Watch: rew up, len toward 1000, ev toward 1, kl around 0.01, ent not collapsing.
+    TensorBoard still records the full SB3 set.
+    """
+
+    HEADER = (
+        "steps | fps  rew  len | ev  kl  ent   "
+        "# rew↑  len→1000  ev→1  kl~0.01  ent should not crash to 0"
+    )
 
     def __init__(self, every: int = 10, total_timesteps: int = 0) -> None:
         super().__init__()
         self.every = max(1, every)
         self.total_timesteps = total_timesteps
         self._rollouts = 0
+        self._header_printed = False
 
     def _on_step(self) -> bool:
         return True
+
+    def _on_training_start(self) -> None:
+        if not self._header_printed:
+            print(self.HEADER, flush=True)
+            self._header_printed = True
 
     def _on_rollout_end(self) -> None:
         self._rollouts += 1
@@ -34,9 +55,16 @@ class CompactLogCallback(BaseCallback):
             length = float(np.mean([ep["l"] for ep in buf]))
         else:
             rew = length = float("nan")
+        # train/* is from the previous PPO update (recorded after this callback
+        # on the first rollout).
+        kv = self.logger.name_to_value
+        ev = kv.get("train/explained_variance", float("nan"))
+        kl = kv.get("train/approx_kl", float("nan"))
+        ent = kv.get("train/entropy_loss", float("nan"))
         total = f"/{self.total_timesteps}" if self.total_timesteps else ""
         print(
-            f"{self.num_timesteps:>8}{total} steps | "
-            f"fps={fps:.0f}  rew={rew:.1f}  len={length:.0f}",
+            f"{self.num_timesteps:>8}{total} | "
+            f"fps={_fmt(fps, '.0f')}  rew={_fmt(rew, '.1f')}  len={_fmt(length, '.0f')} | "
+            f"ev={_fmt(ev, '.2f')}  kl={_fmt(kl, '.3f')}  ent={_fmt(ent, '.2f')}",
             flush=True,
         )

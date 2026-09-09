@@ -134,8 +134,8 @@ def main() -> int:
     ]
     print(
         f"train {timesteps} steps | {n_envs} envs | device={device} | "
-        f"run={run_name}\nprogress bar on; one-line stats every "
-        f"{cfg.get('print_every', 10)} rollouts",
+        f"run={run_name} | every {cfg.get('print_every', 10)} rollouts "
+        f"(full tables: --verbose 1, TensorBoard still on)",
         flush=True,
     )
     learn_kw = dict(
