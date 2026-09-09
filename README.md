@@ -45,6 +45,8 @@ The scene in `robot/mjcf/` is ready to use. Rebuild after changing the URDF:
 ```bash
 python -m quad_loco.convert_urdf
 python scripts/stand.py          # PD hold (no learned policy)
+python -u scripts/check.py       # timed imports + env step (no trained policy)
+python -u scripts/check.py --render   # also probe one off-screen frame
 python -m pytest tests -q
 ```
 
