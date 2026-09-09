@@ -4,13 +4,17 @@
 from __future__ import annotations
 
 import argparse
+import os
 import sys
+import warnings
 from pathlib import Path
 
 import numpy as np
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
+os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "3")
+warnings.filterwarnings("ignore", message="Gym has been unmaintained")
 
 
 def main() -> int:
@@ -24,24 +28,25 @@ def main() -> int:
     parser.add_argument("--deterministic", action="store_true", default=True)
     args = parser.parse_args()
 
-    import gymnasium as gym
-    import imageio.v2 as imageio
     from stable_baselines3 import PPO
     from stable_baselines3.common.vec_env import DummyVecEnv, VecNormalize
 
-    import quad_loco  # noqa: F401
+    from quad_loco.checkpoints import resolve_sb3_zip
+    from quad_loco.env import QuadrupedVelocityEnv
 
-    env_id = "QuadVelocityEasy-v0" if args.easy else "QuadVelocity-v0"
+    model_path = resolve_sb3_zip(args.model)
     command = tuple(args.command) if args.command else None
     render_mode = "rgb_array" if args.video else None
+    if args.video and sys.platform == "linux":
+        os.environ.setdefault("MUJOCO_GL", "egl")
 
     def _make():
-        return gym.make(env_id, easy=args.easy, command=command, render_mode=render_mode)
+        return QuadrupedVelocityEnv(easy=args.easy, command=command, render_mode=render_mode)
 
     venv = DummyVecEnv([_make])
     vecnorm_path = args.vecnorm
     if vecnorm_path is None:
-        candidate = args.model.parent / "vecnormalize.pkl"
+        candidate = model_path.parent / "vecnormalize.pkl"
         if candidate.is_file():
             vecnorm_path = candidate
     if vecnorm_path and Path(vecnorm_path).is_file():
@@ -49,7 +54,10 @@ def main() -> int:
         venv.training = False
         venv.norm_reward = False
 
-    model = PPO.load(args.model, env=venv)
+    load_arg = str(model_path)
+    if load_arg.endswith(".zip"):
+        load_arg = load_arg[:-4]
+    model = PPO.load(load_arg, env=venv)
     raw = venv.venv.envs[0] if hasattr(venv, "venv") else venv.envs[0]
     if hasattr(raw, "unwrapped"):
         raw = raw.unwrapped
@@ -61,6 +69,7 @@ def main() -> int:
         obs = venv.reset()
         done = False
         ep_ret = 0.0
+        infos = [{}]
         while not done:
             action, _ = model.predict(obs, deterministic=args.deterministic)
             obs, reward, dones, infos = venv.step(action)
@@ -77,6 +86,8 @@ def main() -> int:
 
     print(f"mean_return={np.mean(returns):.2f} mean_|vx-cmd|={np.mean(vx_err) if vx_err else float('nan'):.3f}")
     if args.video:
+        import imageio.v2 as imageio
+
         args.video.parent.mkdir(parents=True, exist_ok=True)
         imageio.mimsave(args.video, frames, fps=50)
         print(f"wrote {args.video}")

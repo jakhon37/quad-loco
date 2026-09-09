@@ -1,17 +1,19 @@
-from gymnasium.envs.registration import register
+from gymnasium.envs.registration import registry, register
 
 from quad_loco.env import QuadrupedVelocityEnv
 
-register(
-    id="QuadVelocity-v0",
-    entry_point="quad_loco.env:QuadrupedVelocityEnv",
-    kwargs={"easy": False},
-)
+if "QuadVelocity-v0" not in registry:
+    register(
+        id="QuadVelocity-v0",
+        entry_point="quad_loco.env:QuadrupedVelocityEnv",
+        kwargs={"easy": False},
+    )
 
-register(
-    id="QuadVelocityEasy-v0",
-    entry_point="quad_loco.env:QuadrupedVelocityEnv",
-    kwargs={"easy": True},
-)
+if "QuadVelocityEasy-v0" not in registry:
+    register(
+        id="QuadVelocityEasy-v0",
+        entry_point="quad_loco.env:QuadrupedVelocityEnv",
+        kwargs={"easy": True},
+    )
 
 __all__ = ["QuadrupedVelocityEnv"]

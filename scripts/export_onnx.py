@@ -4,13 +4,17 @@
 from __future__ import annotations
 
 import argparse
+import os
 import sys
+import warnings
 from pathlib import Path
 
 import numpy as np
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
+os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "3")
+warnings.filterwarnings("ignore", message="Gym has been unmaintained")
 
 
 def main() -> int:
@@ -21,10 +25,15 @@ def main() -> int:
 
     from stable_baselines3 import PPO
 
+    from quad_loco.checkpoints import resolve_sb3_zip
     from quad_loco.export import export_sb3_onnx, verify_onnx
 
-    model = PPO.load(args.model)
-    out = args.out or args.model.with_suffix(".onnx")
+    model_path = resolve_sb3_zip(args.model)
+    load_arg = str(model_path)
+    if load_arg.endswith(".zip"):
+        load_arg = load_arg[:-4]
+    model = PPO.load(load_arg)
+    out = args.out or model_path.with_name("policy.onnx")
     export_sb3_onnx(model, out)
     dummy = np.zeros(48, dtype=np.float32)
     err = verify_onnx(out, model, dummy)
