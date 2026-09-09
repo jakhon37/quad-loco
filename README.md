@@ -58,6 +58,8 @@ mjpython scripts/stand.py --viewer
 
 (`scripts/stand.py --viewer` re-execs `mjpython` automatically if it is on `PATH`.)
 
+macOS may print `Task policy set failed: 4 ((os/kern) invalid argument)` from mjpython. That is a Cocoa thread-QoS warning, not a physics failure. A window should still open; close it to finish. Headless `python scripts/stand.py` is the actual pass/fail check.
+
 ## Train
 
 Training is **optional and local-first**. A 1.5M-step run is on the order of 30–40 minutes on a laptop CPU. Google Colab is not required.

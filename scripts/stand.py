@@ -7,6 +7,7 @@ import argparse
 import os
 import shutil
 import sys
+import time
 from pathlib import Path
 
 import numpy as np
@@ -71,22 +72,37 @@ def main() -> int:
         gravity = rot.T @ np.array([0.0, 0.0, -1.0])
         tilts.append(float(np.linalg.norm(gravity[:2])))
 
-    def physics_step() -> None:
+    def physics_step(*, record: bool) -> None:
         data.ctrl[:] = model.key_ctrl[0]
         for _ in range(FRAME_SKIP):
             mujoco.mj_step(model, data)
-        sample_stats()
+        if record:
+            sample_stats()
 
     if args.viewer:
         from mujoco import viewer
 
-        with viewer.launch_passive(model, data) as vis:
-            while vis.is_running():
-                physics_step()
-                vis.sync()
+        dt = model.opt.timestep * FRAME_SKIP
+        print("Opening MuJoCo window. Close it (or Ctrl+C) to exit.", flush=True)
+        print(
+            "On macOS, mjpython may print 'Task policy set failed'; that is a "
+            "Cocoa thread-QoS warning and can be ignored if the window is open.",
+            flush=True,
+        )
+        try:
+            with viewer.launch_passive(model, data) as vis:
+                while vis.is_running():
+                    t0 = time.perf_counter()
+                    physics_step(record=len(heights) < n_steps)
+                    vis.sync()
+                    leftover = dt - (time.perf_counter() - t0)
+                    if leftover > 0:
+                        time.sleep(leftover)
+        except KeyboardInterrupt:
+            print("\nviewer interrupted", flush=True)
     else:
         for _ in range(n_steps):
-            physics_step()
+            physics_step(record=True)
 
     if not heights:
         print("no samples")
