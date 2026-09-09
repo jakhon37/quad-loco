@@ -57,6 +57,27 @@ def make_env(env_id: str, easy: bool, seed: int, idx: int, render_mode=None):
 
     return _init
 
+    
+def make_env(env_id: str, easy: bool, seed: int, idx: int, render_mode=None):
+    def _init():
+        import sys
+        from pathlib import Path
+
+        root = Path(__file__).resolve().parents[1]
+        src = str(root / "src")
+        if src not in sys.path:
+            sys.path.insert(0, src)
+
+        import gymnasium as gym
+        import quad_loco  # noqa: F401 - registers env ids as a side effect
+
+        env = gym.make(env_id, easy=easy, render_mode=render_mode)
+        env.reset(seed=seed + idx)
+        return env
+
+    return _init
+    
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--config", type=Path, default=ROOT / "configs" / "ppo_cpu.yaml")
