@@ -10,6 +10,8 @@ No NVIDIA GPU is required. Physics and the MLP policy both run on CPU.
 URDF → MJCF → Gymnasium env → PPO → eval / video → ONNX
 ```
 
+What is trained, how the loop works, and which library does what: **[docs/OVERVIEW.md](docs/OVERVIEW.md)**.
+
 ## Robot
 
 | | |
